@@ -5,17 +5,58 @@ canvas.width = 800;
 canvas.height = 450;
 
 const tileSize = 40;
-const worldWidth = 100;
-const worldHeight = 30;
+const worldWidth = 150;
+const worldHeight = 50;
 
-// ワールド生成（簡易バイオーム）
+// ワールド生成（バイオーム + 洞窟 + 鉱石）
 let world = Array.from({length: worldHeight}, (_, y) =>
   Array.from({length: worldWidth}, (_, x) => {
-    if(y >= worldHeight - 4) return "dirt";
-    if(y === worldHeight -5) return "grass";
+    if(y >= worldHeight - 10) return "stone"; // 下層
+    if(y >= worldHeight - 4) return "dirt";   // 土
+    if(y === worldHeight - 5) return "grass"; // 草
     return null;
   })
 );
+
+// 洞窟生成
+for(let y = worldHeight - 10; y < worldHeight; y++){
+  for(let x = 0; x < worldWidth; x++){
+    if(world[y][x] === "stone" && Math.random() < 0.05){
+      world[y][x] = null;
+    }
+  }
+}
+
+// 鉱石生成
+for(let y = worldHeight - 10; y < worldHeight; y++){
+  for(let x = 0; x < worldWidth; x++){
+    if(world[y][x] === "stone" && Math.random() < 0.03){
+      world[y][x] = "coal";
+    }
+  }
+}
+
+// 木生成
+function generateTrees() {
+  for(let x=2; x<worldWidth-2; x++){
+    if(Math.random() < 0.05){
+      let groundY = worldHeight - 5;
+      let treeHeight = 3 + Math.floor(Math.random() * 3);
+      for(let h=0; h<treeHeight; h++){
+        world[groundY - h][x] = "wood";
+      }
+      const leafY = groundY - treeHeight;
+      for(let i=-1; i<=1; i++){
+        for(let j=-1; j<=1; j++){
+          if(world[leafY + i]?.[x + j] !== undefined){
+            world[leafY + i][x + j] = "leaf";
+          }
+        }
+      }
+    }
+  }
+}
+generateTrees();
 
 // プレイヤー
 let player = {x:100, y:100, width:30, height:40, vx:0, vy:0, onGround:false, jumpsLeft:2, health:100};
@@ -29,11 +70,11 @@ window.addEventListener("keydown", e=>keys[e.key.toLowerCase()]=true);
 window.addEventListener("keyup", e=>keys[e.key.toLowerCase()]=false);
 
 // ホットバー / インベントリ
-const hotbar = ["dirt","grass","stone","wood"];
-let inventory = {"dirt":0,"grass":0,"stone":0,"wood":0};
+const hotbar = ["dirt","grass","stone","wood","coal"];
+let inventory = {"dirt":0,"grass":0,"stone":0,"wood":0,"coal":0};
 let selectedBlock = 0;
 window.addEventListener("keydown", e=>{
-  if(["1","2","3","4"].includes(e.key)) selectedBlock=parseInt(e.key)-1;
+  if(["1","2","3","4","5"].includes(e.key)) selectedBlock=parseInt(e.key)-1;
 });
 
 // マウスでブロック操作（近く制限 + 採掘）
@@ -71,16 +112,15 @@ function resolveCollision(nextX,nextY){
   let leftTile=Math.floor(x/tileSize);
   let rightTile=Math.floor((x+player.width)/tileSize);
 
-  // 縦判定
   for(let j=topTile;j<=bottomTile;j++){
     for(let i=leftTile;i<=rightTile;i++){
       if(world[j]?.[i]){
-        if(player.vy>0){ //落下
+        if(player.vy>0){
           y=j*tileSize-player.height-margin;
           player.vy=0;
           onGround=true;
           player.jumpsLeft=2;
-        } else if(player.vy<0){ //上昇
+        } else if(player.vy<0){
           y=(j+1)*tileSize+margin;
           player.vy=0;
         }
@@ -88,7 +128,6 @@ function resolveCollision(nextX,nextY){
     }
   }
 
-  // 横判定
   topTile=Math.floor(y/tileSize);
   bottomTile=Math.floor((y+player.height)/tileSize);
   leftTile=Math.floor(x/tileSize);
@@ -121,7 +160,6 @@ function updatePlayer(){
 
   let {x,y,onGround}=resolveCollision(player.x+player.vx,player.y+player.vy);
 
-  // 落下ダメージ
   if(player.onGround && !onGround){
     prevY = player.y;
   }
@@ -147,13 +185,13 @@ function updatePlayer(){
 // クラフトメニュー
 let craftMenuOpen = false;
 const craftItems = [
-  {name:"🛠️ 作業台", requires:{wood:3}},
-  {name:"🪵 板", requires:{wood:1}},
-  {name:"🌿 棒", requires:{wood:1}}
+  {name:"作業台🛠", requires:{wood:3}},
+  {name:"板🪵", requires:{wood:1}},
+  {name:"棒🌲", requires:{wood:1}}
 ];
 
 window.addEventListener("keydown", e=>{
-  if(e.key.toLowerCase() === "o" && inventory["wood"]>0){
+  if(e.key.toLowerCase() === "o" && hotbar[selectedBlock]==="wood"){
     craftMenuOpen = !craftMenuOpen;
   }
 });
@@ -173,25 +211,20 @@ function drawCraftMenu(){
   });
 }
 
-// クラフト処理
 window.addEventListener("keydown", e=>{
   if(!craftMenuOpen) return;
   const num = parseInt(e.key);
   if(num>=1 && num<=craftItems.length){
     const item = craftItems[num-1];
-    // 素材チェック
     let canCraft = true;
     for(const [mat,qty] of Object.entries(item.requires)){
       if(!inventory[mat] || inventory[mat]<qty) canCraft=false;
     }
     if(canCraft){
-      // 素材消費
       for(const [mat,qty] of Object.entries(item.requires)){
         inventory[mat]-=qty;
       }
-      // アイテム生成
       inventory[item.name] = (inventory[item.name]||0)+1;
-      console.log(`${item.name} をクラフトしました！`);
     } else {
       console.log("素材が足りません");
     }
@@ -203,7 +236,7 @@ window.addEventListener("keydown", e=>{
 function draw(){
   ctx.clearRect(0,0,canvas.width,canvas.height);
 
-  // ワールド
+  // ワールド描画
   for(let y=0;y<worldHeight;y++){
     for(let x=0;x<worldWidth;x++){
       const block=world[y][x];
@@ -212,13 +245,16 @@ function draw(){
           case "dirt": ctx.fillStyle="#8b4513"; break;
           case "grass": ctx.fillStyle="#228B22"; break;
           case "stone": ctx.fillStyle="#888"; break;
+          case "wood": ctx.fillStyle="#8B4513"; break;
+          case "leaf": ctx.fillStyle="#32CD32"; break;
+          case "coal": ctx.fillStyle="#333"; break;
         }
         ctx.fillRect(x*tileSize-camera.x,y*tileSize-camera.y,tileSize,tileSize);
       }
     }
   }
 
-  // プレイヤー
+  // プレイヤー描画
   ctx.fillStyle="blue";
   ctx.fillRect(player.x-camera.x,player.y-camera.y,player.width,player.height);
 
@@ -227,11 +263,10 @@ function draw(){
     ctx.fillStyle=i===selectedBlock?"yellow":"grey";
     ctx.fillRect(10+i*50,canvas.height-50,40,40);
     ctx.fillStyle="black";
-    const displayName = b in inventory ? `${b}(${inventory[b]})` : b;
-    ctx.fillText(displayName,12+i*50,canvas.height-20);
+    ctx.fillText(b+"("+inventory[b]+")",12+i*50,canvas.height-20);
   });
 
-  // HPバー
+  // HP
   ctx.fillStyle="red";
   ctx.fillRect(10,10,player.health*2,20);
   ctx.strokeStyle="black";
@@ -241,6 +276,6 @@ function draw(){
   drawCraftMenu();
 }
 
-// ゲームループ
+// ループ
 function gameLoop(){updatePlayer(); draw(); requestAnimationFrame(gameLoop);}
 gameLoop();
