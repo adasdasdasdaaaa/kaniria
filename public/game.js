@@ -8,42 +8,42 @@ const tileSize = 40;
 const worldWidth = 150;
 const worldHeight = 40;
 
-// ワールド生成（表層：土・草 / 下層：石・鉱石 / 洞窟）
+// ワールド生成（表層：草・土 / 下層：石・鉱石 / 洞窟）
 let world = Array.from({length: worldHeight}, (_, y) =>
   Array.from({length: worldWidth}, (_, x) => {
-    if (y >= worldHeight - 10) return "stone"; // 下層
-    if (y >= worldHeight - 4) return "dirt";   // 土
-    if (y === worldHeight - 5) return "grass"; // 草
-    return null;
+    if(y === worldHeight - 5) return "grass";        // 草
+    if(y >= worldHeight - 4 && y < worldHeight - 1) return "dirt"; // 土
+    if(y >= worldHeight - 10 && y < worldHeight - 4) return "stone"; // 石
+    return null; // 空
   })
 );
 
-// 洞窟生成
+// 洞窟生成（石の中にランダムで穴）
 for(let y = worldHeight - 10; y < worldHeight; y++){
   for(let x = 0; x < worldWidth; x++){
-    if(world[y][x]==="stone" && Math.random()<0.05) world[y][x] = null;
+    if(world[y][x] === "stone" && Math.random() < 0.05) world[y][x] = null;
   }
 }
 
 // 石炭生成
 for(let y = worldHeight - 10; y < worldHeight; y++){
   for(let x = 0; x < worldWidth; x++){
-    if(world[y][x]==="stone" && Math.random()<0.03) world[y][x] = "coal";
+    if(world[y][x] === "stone" && Math.random() < 0.03) world[y][x] = "coal";
   }
 }
 
 // 木生成（土の上にしか生えない）
-function generateTrees() {
+function generateTrees(){
   for(let x = 2; x < worldWidth - 2; x++){
     if(Math.random() < 0.05){
-      let groundY = worldHeight - 5; // 草の位置
+      let groundY = worldHeight - 5; // 草の上
       let treeHeight = 3 + Math.floor(Math.random()*3);
-      for(let h=0; h<treeHeight; h++){
+      for(let h = 0; h < treeHeight; h++){
         world[groundY - h][x] = "wood";
       }
-      const leafY = groundY - treeHeight;
-      for(let i=-1; i<=1; i++){
-        for(let j=-1; j<=1; j++){
+      let leafY = groundY - treeHeight;
+      for(let i=-1;i<=1;i++){
+        for(let j=-1;j<=1;j++){
           if(world[leafY+i]?.[x+j] !== undefined) world[leafY+i][x+j] = "leaf";
         }
       }
