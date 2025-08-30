@@ -5,20 +5,13 @@ const tileSize = 40;
 const worldWidth = 50;
 const worldHeight = 20;
 
-// ワールド生成（下に土ブロック）
+// ワールド生成
 let world = Array.from({ length: worldHeight }, (_, y) =>
   Array.from({ length: worldWidth }, (_, x) => y >= 15 ? 1 : 0)
 );
 
 // プレイヤー
-let player = {
-  x: 100,
-  y: 100,
-  width: 30,
-  height: 40,
-  vx: 0,
-  vy: 0
-};
+let player = { x: 100, y: 100, width: 30, height: 40, vx: 0, vy: 0 };
 
 // キー入力
 const keys = {};
@@ -28,63 +21,71 @@ window.addEventListener("keyup", (e) => keys[e.key.toLowerCase()] = false);
 // カメラ
 let camera = { x: 0, y: 0 };
 
-// ブロック操作（左クリック設置・右クリック破壊）
+// マウス操作で設置/破壊
 canvas.addEventListener("mousedown", (e) => {
   const worldX = Math.floor((e.offsetX + camera.x) / tileSize);
   const worldY = Math.floor((e.offsetY + camera.y) / tileSize);
 
-  // プレイヤー中心から1タイル以内
-  const px = player.x + player.width / 2;
-  const py = player.y + player.height / 2;
-  if (Math.abs(px - (worldX * tileSize + tileSize/2)) > tileSize*1.5) return;
-  if (Math.abs(py - (worldY * tileSize + tileSize/2)) > tileSize*1.5) return;
+  const px = player.x + player.width/2;
+  const py = player.y + player.height/2;
+  if (Math.abs(px - (worldX*tileSize + tileSize/2)) > tileSize*1.5) return;
+  if (Math.abs(py - (worldY*tileSize + tileSize/2)) > tileSize*1.5) return;
 
   if (e.button === 0 && world[worldY][worldX] === 0) world[worldY][worldX] = 1;
   if (e.button === 2 && world[worldY][worldX] === 1) world[worldY][worldX] = 0;
 });
-canvas.addEventListener("contextmenu", (e) => e.preventDefault());
+canvas.addEventListener("contextmenu", e => e.preventDefault());
 
-// プレイヤー更新（重力 + 簡易衝突）
+// 衝突判定（AABBスムーズ）
+function resolveCollision(nextX, nextY) {
+  let x = nextX, y = nextY;
+
+  // 縦の衝突
+  const topTile = Math.floor(y / tileSize);
+  const bottomTile = Math.floor((y + player.height) / tileSize);
+  const leftTile = Math.floor(x / tileSize);
+  const rightTile = Math.floor((x + player.width) / tileSize);
+
+  for (let i = topTile; i <= bottomTile; i++) {
+    for (let j = leftTile; j <= rightTile; j++) {
+      if (world[i]?.[j] === 1) {
+        // 上から落下中
+        if (player.vy > 0) y = i*tileSize - player.height;
+        // 上方向
+        if (player.vy < 0) y = (i+1)*tileSize;
+        player.vy = 0;
+      }
+    }
+  }
+
+  // 横の衝突
+  for (let i = topTile; i <= bottomTile; i++) {
+    for (let j = leftTile; j <= rightTile; j++) {
+      if (world[i]?.[j] === 1) {
+        if (player.vx > 0) x = j*tileSize - player.width;
+        if (player.vx < 0) x = (j+1)*tileSize;
+        player.vx = 0;
+      }
+    }
+  }
+
+  return { x, y };
+}
+
+// プレイヤー更新
 function updatePlayer() {
-  // 横移動
   player.vx = 0;
   if (keys["a"]) player.vx = -3;
   if (keys["d"]) player.vx = 3;
 
-  // 縦移動（重力）
-  player.vy += 0.5;
-  if (keys["w"]) player.vy = -5; // ジャンプキーで上に移動
+  if (keys["w"]) player.vy = -7; // 上移動（ジャンプ）
 
-  // 次の位置
-  let nextX = player.x + player.vx;
-  let nextY = player.y + player.vy;
+  player.vy += 0.5; // 重力
 
-  // 衝突判定
-  const leftTile = Math.floor(nextX / tileSize);
-  const rightTile = Math.floor((nextX + player.width) / tileSize);
-  const topTile = Math.floor(nextY / tileSize);
-  const bottomTile = Math.floor((nextY + player.height) / tileSize);
-
-  // 横方向
-  for (let y = topTile; y <= bottomTile; y++) {
-    if (world[y]?.[leftTile] === 1) nextX = leftTile * tileSize + tileSize;
-    if (world[y]?.[rightTile] === 1) nextX = rightTile * tileSize - player.width;
-  }
-
-  // 縦方向
-  for (let x = leftTile; x <= rightTile; x++) {
-    if (player.vy > 0 && world[bottomTile]?.[x] === 1) {
-      nextY = bottomTile * tileSize - player.height;
-      player.vy = 0;
-    }
-    if (player.vy < 0 && world[topTile]?.[x] === 1) {
-      nextY = (topTile+1) * tileSize;
-      player.vy = 0;
-    }
-  }
-
-  player.x = nextX;
-  player.y = nextY;
+  // 滑らか衝突判定
+  const { x, y } = resolveCollision(player.x + player.vx, player.y + player.vy);
+  player.x = x;
+  player.y = y;
 
   // カメラ追尾
   camera.x = player.x - canvas.width/2;
@@ -93,9 +94,8 @@ function updatePlayer() {
 
 // 描画
 function draw() {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.clearRect(0,0,canvas.width,canvas.height);
 
-  // ワールド
   for (let y=0; y<worldHeight; y++) {
     for (let x=0; x<worldWidth; x++) {
       if (world[y][x] === 1) {
@@ -105,7 +105,6 @@ function draw() {
     }
   }
 
-  // プレイヤー
   ctx.fillStyle = "blue";
   ctx.fillRect(player.x - camera.x, player.y - camera.y, player.width, player.height);
 }
