@@ -6,14 +6,14 @@ canvas.height = 450;
 
 const tileSize = 40;
 const worldWidth = 150;
-const worldHeight = 50;
+const worldHeight = 40;
 
-// ワールド生成（バイオーム + 洞窟 + 鉱石）
+// ワールド生成（表層：土・草 / 下層：石・鉱石 / 洞窟）
 let world = Array.from({length: worldHeight}, (_, y) =>
   Array.from({length: worldWidth}, (_, x) => {
-    if(y >= worldHeight - 10) return "stone"; // 下層
-    if(y >= worldHeight - 4) return "dirt";   // 土
-    if(y === worldHeight - 5) return "grass"; // 草
+    if (y >= worldHeight - 10) return "stone"; // 下層
+    if (y >= worldHeight - 4) return "dirt";   // 土
+    if (y === worldHeight - 5) return "grass"; // 草
     return null;
   })
 );
@@ -21,36 +21,30 @@ let world = Array.from({length: worldHeight}, (_, y) =>
 // 洞窟生成
 for(let y = worldHeight - 10; y < worldHeight; y++){
   for(let x = 0; x < worldWidth; x++){
-    if(world[y][x] === "stone" && Math.random() < 0.05){
-      world[y][x] = null;
-    }
+    if(world[y][x]==="stone" && Math.random()<0.05) world[y][x] = null;
   }
 }
 
-// 鉱石生成
+// 石炭生成
 for(let y = worldHeight - 10; y < worldHeight; y++){
   for(let x = 0; x < worldWidth; x++){
-    if(world[y][x] === "stone" && Math.random() < 0.03){
-      world[y][x] = "coal";
-    }
+    if(world[y][x]==="stone" && Math.random()<0.03) world[y][x] = "coal";
   }
 }
 
-// 木生成
+// 木生成（土の上にしか生えない）
 function generateTrees() {
-  for(let x=2; x<worldWidth-2; x++){
+  for(let x = 2; x < worldWidth - 2; x++){
     if(Math.random() < 0.05){
-      let groundY = worldHeight - 5;
-      let treeHeight = 3 + Math.floor(Math.random() * 3);
+      let groundY = worldHeight - 5; // 草の位置
+      let treeHeight = 3 + Math.floor(Math.random()*3);
       for(let h=0; h<treeHeight; h++){
         world[groundY - h][x] = "wood";
       }
       const leafY = groundY - treeHeight;
       for(let i=-1; i<=1; i++){
         for(let j=-1; j<=1; j++){
-          if(world[leafY + i]?.[x + j] !== undefined){
-            world[leafY + i][x + j] = "leaf";
-          }
+          if(world[leafY+i]?.[x+j] !== undefined) world[leafY+i][x+j] = "leaf";
         }
       }
     }
@@ -70,11 +64,11 @@ window.addEventListener("keydown", e=>keys[e.key.toLowerCase()]=true);
 window.addEventListener("keyup", e=>keys[e.key.toLowerCase()]=false);
 
 // ホットバー / インベントリ
-const hotbar = ["dirt","grass","stone","wood","coal"];
-let inventory = {"dirt":0,"grass":0,"stone":0,"wood":0,"coal":0};
+const hotbar = ["wood","leaf","dirt","grass","stone","coal"];
+let inventory = {"wood":0,"leaf":0,"dirt":0,"grass":0,"stone":0,"coal":0};
 let selectedBlock = 0;
 window.addEventListener("keydown", e=>{
-  if(["1","2","3","4","5"].includes(e.key)) selectedBlock=parseInt(e.key)-1;
+  if(["1","2","3","4","5","6"].includes(e.key)) selectedBlock=parseInt(e.key)-1;
 });
 
 // マウスでブロック操作（近く制限 + 採掘）
@@ -86,18 +80,18 @@ canvas.addEventListener("mousedown", e=>{
   if(Math.abs(px-(worldX*tileSize+tileSize/2))>tileSize*2) return;
   if(Math.abs(py-(worldY*tileSize+tileSize/2))>tileSize*2) return;
 
-  if(e.button === 0){ // 設置
+  if(e.button===0){ // 設置
     const blockType = hotbar[selectedBlock];
     if(inventory[blockType] > 0){
       world[worldY][worldX] = blockType;
       inventory[blockType]--;
     }
   }
-  if(e.button === 2){ // 採掘
+  if(e.button===2){ // 採掘
     const block = world[worldY][worldX];
     if(block){
       world[worldY][worldX] = null;
-      inventory[block] = (inventory[block]||0) + 1;
+      inventory[block] = (inventory[block]||0)+1;
     }
   }
 });
@@ -141,7 +135,6 @@ function resolveCollision(nextX,nextY){
       }
     }
   }
-
   return {x,y,onGround};
 }
 
@@ -160,18 +153,16 @@ function updatePlayer(){
 
   let {x,y,onGround}=resolveCollision(player.x+player.vx,player.y+player.vy);
 
-  if(player.onGround && !onGround){
-    prevY = player.y;
-  }
+  if(player.onGround && !onGround) prevY=player.y;
   if(!player.onGround && onGround){
-    const fallDist = y - prevY;
-    if(fallDist > 100) player.health -= Math.floor((fallDist-100)/5);
-    if(player.health < 0) player.health = 0;
+    const fallDist = y-prevY;
+    if(fallDist>100) player.health -= Math.floor((fallDist-100)/5);
+    if(player.health<0) player.health=0;
   }
 
-  player.x = x;
-  player.y = y;
-  player.onGround = onGround;
+  player.x=x;
+  player.y=y;
+  player.onGround=onGround;
 
   if((keys["w"]||keys[" "]) && player.jumpsLeft>0 && (player.onGround||player.jumpsLeft===2)){
     player.vy=jumpSpeed;
@@ -183,16 +174,15 @@ function updatePlayer(){
 }
 
 // クラフトメニュー
-let craftMenuOpen = false;
-const craftItems = [
-  {name:"作業台🛠", requires:{wood:3}},
-  {name:"板🪵", requires:{wood:1}},
-  {name:"棒🌲", requires:{wood:1}}
+let craftMenuOpen=false;
+const craftItems=[
+  {name:"作業台 🛠️", requires:{wood:3}},
+  {name:"板 🪵", requires:{wood:1}},
+  {name:"棒 🏹", requires:{wood:1}}
 ];
-
 window.addEventListener("keydown", e=>{
-  if(e.key.toLowerCase() === "o" && hotbar[selectedBlock]==="wood"){
-    craftMenuOpen = !craftMenuOpen;
+  if(e.key.toLowerCase()==="o" && hotbar[selectedBlock]==="wood"){
+    craftMenuOpen=!craftMenuOpen;
   }
 });
 
@@ -203,7 +193,6 @@ function drawCraftMenu(){
   ctx.fillStyle="white";
   ctx.font="18px sans-serif";
   ctx.fillText("クラフトメニュー", 170,80);
-
   craftItems.forEach((item,i)=>{
     ctx.fillStyle="white";
     ctx.fillText(`${i+1}. ${item.name}`, 170,120+i*40);
@@ -211,24 +200,21 @@ function drawCraftMenu(){
   });
 }
 
+// クラフト処理
 window.addEventListener("keydown", e=>{
   if(!craftMenuOpen) return;
   const num = parseInt(e.key);
   if(num>=1 && num<=craftItems.length){
-    const item = craftItems[num-1];
-    let canCraft = true;
+    const item=craftItems[num-1];
+    let canCraft=true;
     for(const [mat,qty] of Object.entries(item.requires)){
       if(!inventory[mat] || inventory[mat]<qty) canCraft=false;
     }
     if(canCraft){
-      for(const [mat,qty] of Object.entries(item.requires)){
-        inventory[mat]-=qty;
-      }
+      for(const [mat,qty] of Object.entries(item.requires)) inventory[mat]-=qty;
       inventory[item.name] = (inventory[item.name]||0)+1;
-    } else {
-      console.log("素材が足りません");
-    }
-    craftMenuOpen = false;
+    } else console.log("素材が足りません");
+    craftMenuOpen=false;
   }
 });
 
@@ -236,7 +222,7 @@ window.addEventListener("keydown", e=>{
 function draw(){
   ctx.clearRect(0,0,canvas.width,canvas.height);
 
-  // ワールド描画
+  // ワールド
   for(let y=0;y<worldHeight;y++){
     for(let x=0;x<worldWidth;x++){
       const block=world[y][x];
@@ -245,25 +231,29 @@ function draw(){
           case "dirt": ctx.fillStyle="#8b4513"; break;
           case "grass": ctx.fillStyle="#228B22"; break;
           case "stone": ctx.fillStyle="#888"; break;
-          case "wood": ctx.fillStyle="#8B4513"; break;
-          case "leaf": ctx.fillStyle="#32CD32"; break;
-          case "coal": ctx.fillStyle="#333"; break;
+          case "coal": ctx.fillStyle="#222"; break;
+          case "wood": ctx.fillStyle="#a0522d"; break;
+          case "leaf": ctx.fillStyle="#00aa00"; break;
         }
         ctx.fillRect(x*tileSize-camera.x,y*tileSize-camera.y,tileSize,tileSize);
       }
     }
   }
 
-  // プレイヤー描画
+  // プレイヤー
   ctx.fillStyle="blue";
   ctx.fillRect(player.x-camera.x,player.y-camera.y,player.width,player.height);
 
-  // ホットバー
+  // ホットバー（所持アイテムのみ）
+  let displayIndex=0;
   hotbar.forEach((b,i)=>{
-    ctx.fillStyle=i===selectedBlock?"yellow":"grey";
-    ctx.fillRect(10+i*50,canvas.height-50,40,40);
-    ctx.fillStyle="black";
-    ctx.fillText(b+"("+inventory[b]+")",12+i*50,canvas.height-20);
+    if(inventory[b]>0){
+      ctx.fillStyle=i===selectedBlock?"yellow":"grey";
+      ctx.fillRect(10+displayIndex*50,canvas.height-50,40,40);
+      ctx.fillStyle="black";
+      ctx.fillText(b+"("+inventory[b]+")",12+displayIndex*50,canvas.height-20);
+      displayIndex++;
+    }
   });
 
   // HP
