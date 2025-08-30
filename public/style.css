@@ -1,10 +1,10 @@
 body {
-  background: #87ceeb;
   margin: 0;
-  text-align: center;
+  background: #87ceeb;
+  overflow: hidden;
 }
-
-#game {
-  border: 2px solid black;
-  background: #cceeff;
+canvas {
+  display: block;
+  margin: auto;
+  background: #5da130; /* 草っぽい色 */
 }
