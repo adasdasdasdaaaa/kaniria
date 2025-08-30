@@ -8,7 +8,7 @@ const tileSize = 40;
 const worldWidth = 50;
 const worldHeight = 20;
 
-// ワールド生成（背景・地形）
+// ワールド生成（簡易地形）
 let world = Array.from({length: worldHeight}, (_, y) =>
   Array.from({length: worldWidth}, (_, x) => {
     if(y >= 16) return "dirt";
@@ -24,22 +24,22 @@ let player = {
   jumpsLeft: 2, health: 100
 };
 
+// カメラ
+let camera = {x:0, y:0};
+
 // キー入力
 const keys = {};
 window.addEventListener("keydown", e => keys[e.key.toLowerCase()] = true);
 window.addEventListener("keyup", e => keys[e.key.toLowerCase()] = false);
 
-// ホットバー（ブロック種類）
+// ホットバー
 const hotbar = ["dirt","grass","stone"];
 let selectedBlock = 0;
 window.addEventListener("keydown", e => {
   if(["1","2","3"].includes(e.key)) selectedBlock = parseInt(e.key)-1;
 });
 
-// カメラ
-let camera = {x:0, y:0};
-
-// ブロック操作
+// マウスでブロック操作
 canvas.addEventListener("mousedown", e => {
   const worldX = Math.floor((e.offsetX + camera.x)/tileSize);
   const worldY = Math.floor((e.offsetY + camera.y)/tileSize);
@@ -54,61 +54,73 @@ canvas.addEventListener("mousedown", e => {
 });
 canvas.addEventListener("contextmenu", e => e.preventDefault());
 
-// 重力と衝突判定（簡易AABB）
+// 衝突判定（縦横分離）
 function resolveCollision(nextX,nextY){
   let x=nextX,y=nextY,onGround=false;
-  const left=Math.floor(x/tileSize);
-  const right=Math.floor((x+player.width)/tileSize);
-  const top=Math.floor(y/tileSize);
-  const bottom=Math.floor((y+player.height)/tileSize);
 
-  // 縦方向
-  for(let i=left;i<=right;i++){
-    for(let j=top;j<=bottom;j++){
+  // 縦
+  let topTile=Math.floor(y/tileSize);
+  let bottomTile=Math.floor((y+player.height)/tileSize);
+  let leftTile=Math.floor(x/tileSize);
+  let rightTile=Math.floor((x+player.width)/tileSize);
+
+  for(let j=topTile;j<=bottomTile;j++){
+    for(let i=leftTile;i<=rightTile;i++){
       if(world[j]?.[i]){
         if(player.vy>0){y=j*tileSize-player.height; onGround=true; player.vy=0; player.jumpsLeft=2;}
         if(player.vy<0){y=(j+1)*tileSize; player.vy=0;}
       }
     }
   }
-  // 横方向
-  for(let i=top;i<=bottom;i++){
-    for(let j=left;j<=right;j++){
-      if(world[i]?.[j]){
-        if(player.vx>0)x=j*tileSize-player.width;
-        if(player.vx<0)x=(j+1)*tileSize;
+
+  // 横
+  topTile=Math.floor(y/tileSize);
+  bottomTile=Math.floor((y+player.height)/tileSize);
+  leftTile=Math.floor(x/tileSize);
+  rightTile=Math.floor((x+player.width)/tileSize);
+
+  for(let j=topTile;j<=bottomTile;j++){
+    for(let i=leftTile;i<=rightTile;i++){
+      if(world[j]?.[i]){
+        if(player.vx>0) x=i*tileSize-player.width;
+        if(player.vx<0) x=(i+1)*tileSize;
         player.vx=0;
       }
     }
   }
+
   return {x,y,onGround};
 }
 
-// 更新
+// プレイヤー更新
 function updatePlayer(){
-  // 横移動慣性
-  const accel=0.3,friction=0.8,maxSpeed=5;
+  const accel=0.3, friction=0.8, maxSpeed=5, gravity=0.5, jumpSpeed=-8;
+
+  // 横移動
   if(keys["a"]) player.vx -= accel;
   if(keys["d"]) player.vx += accel;
-  if(!keys["a"]&&!keys["d"]) player.vx*=friction;
-  player.vx=Math.max(Math.min(player.vx,maxSpeed),-maxSpeed);
-
-  // ジャンプ
-  if((keys["w"]||keys[" "]) && player.jumpsLeft>0){
-    player.vy=-8; player.jumpsLeft--;
-  }
+  if(!keys["a"]&&!keys["d"]) player.vx *= friction;
+  player.vx = Math.max(Math.min(player.vx,maxSpeed), -maxSpeed);
 
   // 重力
-  player.vy+=0.5;
+  player.vy += gravity;
   if(player.vy>12) player.vy=12;
 
   // 衝突
-  const {x,y,onGround}=resolveCollision(player.x+player.vx,player.y+player.vy);
-  player.x=x; player.y=y; player.onGround=onGround;
+  let {x,y,onGround} = resolveCollision(player.x+player.vx, player.y+player.vy);
+  player.x = x;
+  player.y = y;
+  player.onGround = onGround;
 
-  // カメラ
-  camera.x=player.x-canvas.width/2;
-  camera.y=player.y-canvas.height/2;
+  // ジャンプ
+  if((keys["w"]||keys[" "]) && player.jumpsLeft>0 && (player.onGround || player.jumpsLeft===2)){
+    player.vy=jumpSpeed;
+    player.jumpsLeft--;
+  }
+
+  // カメラ追尾
+  camera.x = player.x - canvas.width/2;
+  camera.y = player.y - canvas.height/2;
 }
 
 // 描画
@@ -145,4 +157,5 @@ function gameLoop(){
   draw();
   requestAnimationFrame(gameLoop);
 }
+
 gameLoop();
