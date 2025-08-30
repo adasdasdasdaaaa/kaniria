@@ -17,9 +17,6 @@ let world = Array.from({length: worldHeight}, (_, y) =>
   })
 );
 
-// 木を1本初期配置（クラフトテスト用）
-world[worldHeight-6][5] = "wood";
-
 // プレイヤー
 let player = {x:100, y:100, width:30, height:40, vx:0, vy:0, onGround:false, jumpsLeft:2, health:100};
 
@@ -33,7 +30,7 @@ window.addEventListener("keyup", e=>keys[e.key.toLowerCase()]=false);
 
 // ホットバー / インベントリ
 const hotbar = ["dirt","grass","stone","wood"];
-let inventory = {"dirt":0,"grass":0,"stone":0,"wood":1}; // 木1個初期
+let inventory = {"dirt":0,"grass":0,"stone":0,"wood":0};
 let selectedBlock = 0;
 window.addEventListener("keydown", e=>{
   if(["1","2","3","4"].includes(e.key)) selectedBlock=parseInt(e.key)-1;
@@ -150,17 +147,33 @@ function updatePlayer(){
 // クラフトメニュー
 let craftMenuOpen = false;
 const craftItems = [
-  {name:"作業台", requires:{wood:3}},
-  {name:"板", requires:{wood:1}},
-  {name:"棒", requires:{wood:1}}
+  {name:"🛠️ 作業台", requires:{wood:3}},
+  {name:"🪵 板", requires:{wood:1}},
+  {name:"🌿 棒", requires:{wood:1}}
 ];
 
 window.addEventListener("keydown", e=>{
-  if(e.key.toLowerCase() === "o" && inventory["wood"] > 0){
+  if(e.key.toLowerCase() === "o" && inventory["wood"]>0){
     craftMenuOpen = !craftMenuOpen;
   }
 });
 
+function drawCraftMenu(){
+  if(!craftMenuOpen) return;
+  ctx.fillStyle="rgba(0,0,0,0.7)";
+  ctx.fillRect(150,50,500,300);
+  ctx.fillStyle="white";
+  ctx.font="18px sans-serif";
+  ctx.fillText("クラフトメニュー", 170,80);
+
+  craftItems.forEach((item,i)=>{
+    ctx.fillStyle="white";
+    ctx.fillText(`${i+1}. ${item.name}`, 170,120+i*40);
+    ctx.fillText(`必要素材: ${Object.entries(item.requires).map(([k,v])=>k+"x"+v).join(", ")}`, 250,120+i*40);
+  });
+}
+
+// クラフト処理
 window.addEventListener("keydown", e=>{
   if(!craftMenuOpen) return;
   const num = parseInt(e.key);
@@ -172,10 +185,13 @@ window.addEventListener("keydown", e=>{
       if(!inventory[mat] || inventory[mat]<qty) canCraft=false;
     }
     if(canCraft){
+      // 素材消費
       for(const [mat,qty] of Object.entries(item.requires)){
         inventory[mat]-=qty;
       }
+      // アイテム生成
       inventory[item.name] = (inventory[item.name]||0)+1;
+      console.log(`${item.name} をクラフトしました！`);
     } else {
       console.log("素材が足りません");
     }
@@ -187,55 +203,44 @@ window.addEventListener("keydown", e=>{
 function draw(){
   ctx.clearRect(0,0,canvas.width,canvas.height);
 
-  // ワールド描画
+  // ワールド
   for(let y=0;y<worldHeight;y++){
     for(let x=0;x<worldWidth;x++){
-      const block = world[y][x];
+      const block=world[y][x];
       if(block){
         switch(block){
           case "dirt": ctx.fillStyle="#8b4513"; break;
           case "grass": ctx.fillStyle="#228B22"; break;
           case "stone": ctx.fillStyle="#888"; break;
-          case "wood": ctx.fillStyle="#deb887"; break;
-          default: ctx.fillStyle="magenta"; // エラー確認用
         }
-        ctx.fillRect(x*tileSize-camera.x, y*tileSize-camera.y, tileSize, tileSize);
+        ctx.fillRect(x*tileSize-camera.x,y*tileSize-camera.y,tileSize,tileSize);
       }
     }
   }
 
-  // プレイヤー描画
+  // プレイヤー
   ctx.fillStyle="blue";
-  ctx.fillRect(player.x-camera.x, player.y-camera.y, player.width, player.height);
+  ctx.fillRect(player.x-camera.x,player.y-camera.y,player.width,player.height);
 
   // ホットバー
   hotbar.forEach((b,i)=>{
     ctx.fillStyle=i===selectedBlock?"yellow":"grey";
     ctx.fillRect(10+i*50,canvas.height-50,40,40);
     ctx.fillStyle="black";
-    ctx.fillText(b+"("+ (inventory[b]||0) +")",12+i*50,canvas.height-20);
+    const displayName = b in inventory ? `${b}(${inventory[b]})` : b;
+    ctx.fillText(displayName,12+i*50,canvas.height-20);
   });
 
-  // HP表示
+  // HPバー
   ctx.fillStyle="red";
   ctx.fillRect(10,10,player.health*2,20);
   ctx.strokeStyle="black";
   ctx.strokeRect(10,10,200,20);
 
   // クラフトメニュー
-  if(craftMenuOpen){
-    ctx.fillStyle="rgba(0,0,0,0.7)";
-    ctx.fillRect(150,50,500,300);
-    ctx.fillStyle="white";
-    ctx.font="18px sans-serif";
-    ctx.fillText("クラフトメニュー", 170,80);
-    craftItems.forEach((item,i)=>{
-      ctx.fillText(`${i+1}. ${item.name}`, 170,120+i*40);
-      ctx.fillText(`必要素材: ${Object.entries(item.requires).map(([k,v])=>k+"x"+v).join(", ")}`, 250,120+i*40);
-    });
-  }
+  drawCraftMenu();
 }
 
-// ループ
-function gameLoop(){ updatePlayer(); draw(); requestAnimationFrame(gameLoop); }
+// ゲームループ
+function gameLoop(){updatePlayer(); draw(); requestAnimationFrame(gameLoop);}
 gameLoop();
