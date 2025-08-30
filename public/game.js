@@ -54,11 +54,12 @@ canvas.addEventListener("mousedown", e => {
 });
 canvas.addEventListener("contextmenu", e => e.preventDefault());
 
-// 衝突判定（縦横分離）
+// 衝突判定（縦横分離 + マージン追加）
 function resolveCollision(nextX,nextY){
   let x=nextX,y=nextY,onGround=false;
+  const margin = 0.1;
 
-  // 縦
+  // 縦判定
   let topTile=Math.floor(y/tileSize);
   let bottomTile=Math.floor((y+player.height)/tileSize);
   let leftTile=Math.floor(x/tileSize);
@@ -67,13 +68,20 @@ function resolveCollision(nextX,nextY){
   for(let j=topTile;j<=bottomTile;j++){
     for(let i=leftTile;i<=rightTile;i++){
       if(world[j]?.[i]){
-        if(player.vy>0){y=j*tileSize-player.height; onGround=true; player.vy=0; player.jumpsLeft=2;}
-        if(player.vy<0){y=(j+1)*tileSize; player.vy=0;}
+        if(player.vy>0){ //落下
+          y = j*tileSize - player.height - margin;
+          player.vy=0;
+          onGround=true;
+          player.jumpsLeft=2;
+        } else if(player.vy<0){ //上昇
+          y = (j+1)*tileSize + margin;
+          player.vy=0;
+        }
       }
     }
   }
 
-  // 横
+  // 横判定
   topTile=Math.floor(y/tileSize);
   bottomTile=Math.floor((y+player.height)/tileSize);
   leftTile=Math.floor(x/tileSize);
@@ -82,8 +90,8 @@ function resolveCollision(nextX,nextY){
   for(let j=topTile;j<=bottomTile;j++){
     for(let i=leftTile;i<=rightTile;i++){
       if(world[j]?.[i]){
-        if(player.vx>0) x=i*tileSize-player.width;
-        if(player.vx<0) x=(i+1)*tileSize;
+        if(player.vx>0) x = i*tileSize - player.width - margin;
+        if(player.vx<0) x = (i+1)*tileSize + margin;
         player.vx=0;
       }
     }
@@ -114,7 +122,7 @@ function updatePlayer(){
 
   // ジャンプ
   if((keys["w"]||keys[" "]) && player.jumpsLeft>0 && (player.onGround || player.jumpsLeft===2)){
-    player.vy=jumpSpeed;
+    player.vy = -8;
     player.jumpsLeft--;
   }
 
@@ -130,7 +138,7 @@ function draw(){
   // ワールド
   for(let y=0;y<worldHeight;y++){
     for(let x=0;x<worldWidth;x++){
-      const block=world[y][x];
+      const block = world[y][x];
       if(block){
         ctx.fillStyle = block==="dirt"?"#8b4513": block==="grass"?"#228B22":"#888";
         ctx.fillRect(x*tileSize-camera.x, y*tileSize-camera.y, tileSize, tileSize);
@@ -140,14 +148,14 @@ function draw(){
 
   // プレイヤー
   ctx.fillStyle="blue";
-  ctx.fillRect(player.x-camera.x,player.y-camera.y,player.width,player.height);
+  ctx.fillRect(player.x-camera.x, player.y-camera.y, player.width, player.height);
 
   // ホットバー
   hotbar.forEach((b,i)=>{
     ctx.fillStyle=i===selectedBlock?"yellow":"grey";
-    ctx.fillRect(10+i*50,canvas.height-50,40,40);
+    ctx.fillRect(10+i*50, canvas.height-50, 40, 40);
     ctx.fillStyle="black";
-    ctx.fillText(b,12+i*50,canvas.height-20);
+    ctx.fillText(b, 12+i*50, canvas.height-20);
   });
 }
 
