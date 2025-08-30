@@ -182,6 +182,70 @@ function draw(){
   ctx.strokeRect(10,10,200,20);
 }
 
+// 既存のインベントリ・ホットバーはそのまま
+// 追加：クラフトメニュー
+let craftMenuOpen = false;
+const craftItems = [
+  {name:"作業台", requires:{wood:3}},
+  {name:"板", requires:{wood:1}},
+  {name:"棒", requires:{wood:1}}
+];
+
+window.addEventListener("keydown", e=>{
+  if(e.key.toLowerCase() === "o" && hotbar[selectedBlock]==="wood"){
+    craftMenuOpen = !craftMenuOpen;
+  }
+});
+
+function drawCraftMenu(){
+  if(!craftMenuOpen) return;
+  ctx.fillStyle="rgba(0,0,0,0.7)";
+  ctx.fillRect(150,50,500,300);
+  ctx.fillStyle="white";
+  ctx.font="18px sans-serif";
+  ctx.fillText("クラフトメニュー", 170,80);
+
+  craftItems.forEach((item,i)=>{
+    ctx.fillStyle="white";
+    ctx.fillText(`${i+1}. ${item.name}`, 170,120+i*40);
+    ctx.fillText(`必要素材: ${Object.entries(item.requires).map(([k,v])=>k+"x"+v).join(", ")}`, 250,120+i*40);
+  });
+}
+
+// クラフト処理
+window.addEventListener("keydown", e=>{
+  if(!craftMenuOpen) return;
+  const num = parseInt(e.key);
+  if(num>=1 && num<=craftItems.length){
+    const item = craftItems[num-1];
+    // 素材チェック
+    let canCraft = true;
+    for(const [mat,qty] of Object.entries(item.requires)){
+      if(!inventory[mat] || inventory[mat]<qty) canCraft=false;
+    }
+    if(canCraft){
+      // 素材消費
+      for(const [mat,qty] of Object.entries(item.requires)){
+        inventory[mat]-=qty;
+      }
+      // アイテム生成
+      inventory[item.name] = (inventory[item.name]||0)+1;
+    } else {
+      console.log("素材が足りません");
+    }
+    craftMenuOpen = false;
+  }
+});
+
+// 描画ルーチンに追加
+function draw(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  // ... 既存の描画 ...
+
+  // クラフトメニュー
+  drawCraftMenu();
+}
+
 // ループ
 function gameLoop(){updatePlayer(); draw(); requestAnimationFrame(gameLoop);}
 gameLoop();
