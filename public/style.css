@@ -8,3 +8,11 @@ canvas {
   margin: auto;
   background: #5da130;
 }
+switch(block){
+  case "dirt": ctx.fillStyle="#8b4513"; break;
+  case "grass": ctx.fillStyle="#228B22"; break;
+  case "stone": ctx.fillStyle="#888"; break;
+  case "wood": ctx.fillStyle="#8B4513"; break;
+  case "leaf": ctx.fillStyle="#32CD32"; break;
+  case "coal": ctx.fillStyle="#333"; break;
+}
